@@ -15,9 +15,9 @@
   <author>Christian Leon</author>
   <license file="LICENSE">MIT</license>
 
-  <url type="repository" branch="main">https://github.com/christianleon/freecad-matcap</url>
-  <url type="readme">https://github.com/christianleon/freecad-matcap/blob/main/README.md</url>
-  <url type="bugtracker">https://github.com/christianleon/freecad-matcap/issues</url>
+  <url type="repository" branch="main">https://github.com/chrleon/freecad-matcap</url>
+  <url type="readme">https://github.com/chrleon/freecad-matcap/blob/main/README.md</url>
+  <url type="bugtracker">https://github.com/chrleon/freecad-matcap/issues</url>
 
   <icon>MatCap.svg</icon>
 
