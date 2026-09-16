@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<package format="1" xmlns="https://wiki.freecad.org/Package_Metadata">
+  <name>MatCap</name>
+  <description>
+    Materialvisning rett i FreeCADs 3D-vindu, uten renderer. En
+    GLSL-shader i Coin3D-scenegrafen slår opp farge etter normalretningen,
+    slik at objektene ser ut som metall, leire eller printet plast mens du
+    modellerer. I tillegg prosedyrisk overflateruhet med fysiske mål,
+    kavitetsskygge i fordypninger, og blyantskravering i fire trinn.
+  </description>
+  <version>1.0.0</version>
+  <date>2026-09-16</date>
+
+  <maintainer email="christian.christensen@scaleaq.com">Christian Leon</maintainer>
+  <author>Christian Leon</author>
+  <license file="LICENSE">MIT</license>
+
+  <url type="repository" branch="main">https://github.com/christianleon/freecad-matcap</url>
+  <url type="readme">https://github.com/christianleon/freecad-matcap/blob/main/README.md</url>
+  <url type="bugtracker">https://github.com/christianleon/freecad-matcap/issues</url>
+
+  <icon>MatCap.svg</icon>
+
+  <content>
+    <macro>
+      <name>MatCap</name>
+      <description>Matcap-materialer, overflate og skravering i 3D-visningen</description>
+      <version>1.0.0</version>
+      <icon>MatCap.svg</icon>
+      <subdirectory>./</subdirectory>
+      <files>
+        <file>MatCap.FCMacro</file>
+        <file>MatCap.svg</file>
+        <file>matcaps/bl_clay_studio.png</file>
+        <file>matcaps/bl_metal_full.png</file>
+        <file>matcaps/clay_light.png</file>
+        <file>matcaps/clay_warm.png</file>
+        <file>matcaps/metal_alu.png</file>
+        <file>matcaps/metal_dark.png</file>
+        <file>matcaps/metal_steel.png</file>
+        <file>matcaps/plast_cream.png</file>
+        <file>matcaps/plast_grey.png</file>
+        <file>matcaps/plast_white.png</file>
+        <file>matcaps/print_pla_grey.png</file>
+        <file>matcaps/toon_clay.png</file>
+        <file>matcaps/toon_moss.png</file>
+        <file>matcaps/toon_paper.png</file>
+        <file>matcaps/toon_sky.png</file>
+      </files>
+      <freecadmin>1.0</freecadmin>
+    </macro>
+  </content>
+</package>

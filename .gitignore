@@ -1,0 +1,11 @@
+# Bygget testgeometri. Lages på nytt med demo_wheel.py.
+demo_wheel.FCStd
+*.FCStd1
+
+# Blenders øvrige matcaps. De er for mørke eller for flate til bruk her,
+# og hentes på nytt med import_blender_matcaps.py om noen vil se dem.
+matcaps/extra/
+
+__pycache__/
+*.pyc
+.DS_Store

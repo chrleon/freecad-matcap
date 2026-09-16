@@ -1,0 +1,873 @@
+# -*- coding: utf-8 -*-
+"""MatCap for FreeCAD
+
+Materialvisning rett i 3D-vinduet, uten renderer. En GLSL-shader legges
+inn i Coin3D-scenegrafen og slår opp farge etter normalretningen, slik at
+objektene ser ut som metall, leire eller printet plast mens du modellerer.
+
+I tillegg: prosedyrisk overflateruhet med fysiske mål, kavitetsskygge i
+fordypninger, og blyantskravering i fire trinn.
+
+Bruk:
+    Marker ett eller flere objekter og kjør makroen. Uten markering
+    behandles alle synlige objekter i det aktive dokumentet. Alt slår inn
+    med én gang; Fjern tar shaderen av igjen.
+
+Ingenting lagres i FCStd-fila. Endringene lever i scenegrafen og
+forsvinner når dokumentet lukkes.
+"""
+
+import os
+
+import FreeCAD
+import FreeCADGui as Gui
+from pivy import coin
+from PySide import QtGui, QtCore
+
+__Name__ = "MatCap"
+__Comment__ = ("Matcap-materialer, overflateruhet, kavitetsskygge og "
+               "blyantskravering rett i 3D-visningen")
+__Author__ = "Christian Leon"
+__Version__ = "1.0.0"
+__Date__ = "2026-09-16"
+__License__ = "MIT"
+__Web__ = "https://github.com/christianleon/freecad-matcap"
+__Wiki__ = "https://github.com/christianleon/freecad-matcap"
+__Icon__ = "MatCap.svg"
+__Help__ = "Marker objekter og trykk Bruk, eller kjør uten markering."
+__Status__ = "Stable"
+__Requires__ = "FreeCAD >= 1.0"
+__Files__ = ("MatCap.svg,"
+             "matcaps/bl_clay_studio.png,matcaps/bl_metal_full.png,"
+             "matcaps/clay_light.png,matcaps/clay_warm.png,"
+             "matcaps/metal_alu.png,matcaps/metal_dark.png,"
+             "matcaps/metal_steel.png,matcaps/plast_cream.png,"
+             "matcaps/plast_grey.png,matcaps/plast_white.png,"
+             "matcaps/print_pla_grey.png,matcaps/toon_clay.png,"
+             "matcaps/toon_moss.png,matcaps/toon_paper.png,"
+             "matcaps/toon_sky.png")
+
+__title__ = __Name__
+__author__ = __Author__
+__version__ = __Version__
+
+# ---------------------------------------------------------------- oppsett
+
+def _matcap_dir():
+    """Finner teksturmappen, også når makroen kjøres via en symlenke.
+
+    realpath følger lenken til prosjektmappen. Ligger teksturene ved siden
+    av selve lenken i stedet, bruker vi den plasseringen.
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    real = os.path.dirname(os.path.realpath(__file__))
+    for candidate in (os.path.join(real, "matcaps"),
+                      os.path.join(here, "matcaps")):
+        if os.path.isdir(candidate):
+            return candidate
+    return os.path.join(real, "matcaps")
+
+
+MATCAP_DIR = _matcap_dir()
+
+# Mørk grå, ikke svart. Svarte kanter blir harde og tegneserieaktige;
+# Fusion tegner dem som en dempet grå strek.
+DARK_EDGE = (0.16, 0.16, 0.18)
+
+# Coin kjører gammel GLSL. ftransform() og gl_NormalMatrix er akkurat det
+# vi vil ha her: normalen i view-space, xy brukt som UV i matcap-teksturen.
+# Normalen og posisjonen sendes videre i objektrom, ikke view-space.
+# Overflatemønsteret skal sitte fast på emnet når man roterer kameraet,
+# og da må det regnes i emnets eget koordinatsystem.
+VERTEX_SRC = """
+varying vec3 vObjNormal;
+varying vec3 vObjPos;
+void main()
+{
+    vObjNormal = gl_Normal;
+    vObjPos = gl_Vertex.xyz;
+    gl_Position = ftransform();
+}
+"""
+
+# gl_NormalMatrix er en innebygd uniform og er tilgjengelig også i
+# fragment-shaderen. Derfor kan vi forstyrre normalen i objektrom først,
+# og transformere til view-space etterpå, per piksel.
+FRAGMENT_SRC = """
+varying vec3 vObjNormal;
+varying vec3 vObjPos;
+
+uniform sampler2D matcap;
+uniform float tint;
+uniform int finish;          // 0 ingen, 1 dreid, 2 sandblåst, 3 printlag
+uniform float finishAmount;
+uniform float finishScale;   // perioder per millimeter
+
+// Grensene mellom de fire skraveringssonene, i lyshet.
+#define T_DARK 0.30
+#define T_MID 0.52
+#define T_LIGHT 0.74
+
+uniform float cavity;        // styrke på fordypningsskyggen
+uniform float cavityRadius;  // millimeter
+
+uniform int hatch;           // 0 av, ellers antall lag skravering
+uniform float hatchSpacing;  // piksler mellom strekene
+uniform float hatchStrength;
+uniform vec3 hatchInk;
+
+float hash(vec3 p)
+{
+    return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+}
+
+float vnoise1(float x)
+{
+    float i = floor(x);
+    float f = fract(x);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(hash(vec3(i, 0.0, 0.0)), hash(vec3(i + 1.0, 0.0, 0.0)), f);
+}
+
+float vnoise3(vec3 p)
+{
+    vec3 i = floor(p);
+    vec3 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float a = mix(hash(i + vec3(0.0, 0.0, 0.0)),
+                  hash(i + vec3(1.0, 0.0, 0.0)), f.x);
+    float b = mix(hash(i + vec3(0.0, 1.0, 0.0)),
+                  hash(i + vec3(1.0, 1.0, 0.0)), f.x);
+    float c = mix(hash(i + vec3(0.0, 0.0, 1.0)),
+                  hash(i + vec3(1.0, 0.0, 1.0)), f.x);
+    float d = mix(hash(i + vec3(0.0, 1.0, 1.0)),
+                  hash(i + vec3(1.0, 1.0, 1.0)), f.x);
+    return mix(mix(a, b, f.y), mix(c, d, f.y), f.z);
+}
+
+// Høydefeltet mønsteret beskriver. Vi tegner det aldri; vi bruker bare
+// stigningen til å vippe normalen.
+float height(vec3 p)
+{
+    if (finish == 1) {
+        // Dreid: ringer rundt emnet, med ujevn avstand slik en dreid
+        // eller børstet flate faktisk ser ut.
+        return vnoise1(p.z * finishScale)
+             + 0.35 * vnoise1(p.z * finishScale * 3.7);
+    }
+    if (finish == 2) {
+        // Sandblåst: isotropisk, like grovt i alle retninger.
+        return vnoise3(p * finishScale)
+             + 0.4 * vnoise3(p * finishScale * 2.3);
+    }
+    if (finish == 3) {
+        // Printlag: hver lagstreng er en avrundet vulst. Én periode
+        // tilsvarer én lagtykkelse.
+        return sin(3.14159265 * fract(p.z * finishScale));
+    }
+    return 0.0;
+}
+
+// Ett lag skravering. Strekene ligger i skjermrom, ikke på modellen.
+// En matcap kan bære skravering selv, men bare der normalen varierer:
+// en plan flate har én normal, altså ett oppslag, altså én flat farge og
+// ingen streker. Derfor tegnes de her i stedet, mot gl_FragCoord.
+float hatch_layer(vec2 frag, float angle, float spacing, float weight)
+{
+    vec2 dir = vec2(cos(angle), sin(angle));
+    float t = dot(frag, dir) / spacing;
+
+    // Litt ujevnhet per strek, ellers ser det trykt ut og ikke tegnet.
+    float line = floor(t);
+    float jitter = fract(sin(line * 91.7) * 43758.5453);
+    // Tynt. Blyant bygger mørke med mange streker, ikke med brede. For
+    // tykke streker gir gravyr, ikke skravering.
+    float thickness = 0.05 + 0.13 * weight + 0.03 * jitter;
+
+    float d = abs(fract(t) - 0.5);
+    float stroke = 1.0 - smoothstep(thickness, thickness + 0.10, d);
+
+    // Blyanten slipper opp underveis, så streken varierer i styrke
+    // langs sin egen retning.
+    vec2 along = vec2(-dir.y, dir.x);
+    float s = dot(frag, along) / (spacing * 5.0);
+    float fade = 0.75 + 0.25 * fract(sin(floor(s) * 37.3 + line) * 24634.6);
+
+    return stroke * fade;
+}
+
+// Prikker til det nest lyseste trinnet. Et jittret rutenett, ikke et
+// regelmessig, ellers leser det som en trykkraster og ikke som en hånd.
+float dot_layer(vec2 frag, float spacing, float weight)
+{
+    vec2 cell = floor(frag / spacing);
+    vec2 f = fract(frag / spacing);
+    float jx = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
+    float jy = fract(sin(dot(cell, vec2(39.3468, 11.135))) * 24634.6345);
+    float keep = fract(sin(dot(cell, vec2(63.7264, 21.982))) * 15731.743);
+
+    // Noen celler står tomme. Uten det blir tettheten for jevn.
+    if (keep > 0.30 + 0.65 * weight) {
+        return 0.0;
+    }
+    vec2 centre = vec2(0.25 + 0.5 * jx, 0.25 + 0.5 * jy);
+    float r = 0.06 + 0.10 * weight;
+    return 1.0 - smoothstep(r, r + 0.07, length(f - centre));
+}
+
+// Mykt vindu rundt et intervall, så trinnene i skraveringen ikke får en
+// hard kant tvers over flaten.
+float band(float x, float lo, float hi, float e)
+{
+    return smoothstep(lo - e, lo + e, x) * (1.0 - smoothstep(hi - e, hi + e, x));
+}
+
+void main()
+{
+    vec3 n = normalize(vObjNormal);
+
+    if (finish > 0 && finishAmount > 0.0) {
+        // Stigningen regnes med differanser. Vi normaliserer med
+        // finishScale, ellers ville et finere mønster automatisk gitt
+        // kraftigere utslag, og styrken hadde betydd noe nytt hver gang.
+        float e = 0.35 / finishScale;
+        vec3 ex = vec3(e, 0.0, 0.0);
+        vec3 ey = vec3(0.0, e, 0.0);
+        vec3 ez = vec3(0.0, 0.0, e);
+        vec3 g = vec3(height(vObjPos + ex) - height(vObjPos - ex),
+                      height(vObjPos + ey) - height(vObjPos - ey),
+                      height(vObjPos + ez) - height(vObjPos - ez))
+                 / (2.0 * e);
+        g = g / finishScale;
+
+        // Bare komponenten langs flaten skal telle. Trekker vi ikke fra
+        // normalretningen, blir mønsteret en oppblåsing i stedet for en
+        // ruhet, og flater vendt mot lyset flimrer.
+        g = g - n * dot(g, n);
+        n = normalize(n - finishAmount * g);
+    }
+
+    // Fordypninger. Krumningen finnes ved å sammenligne hvor mye
+    // normalen dreier med hvor langt vi flyttet oss, mellom nabopiksler.
+    // Negativ krumning er konkav, altså et hjørne eller en not, og det er
+    // der lys faktisk blir fanget.
+    //
+    // Dette er kavitetsskygge, ikke ekte ambient occlusion. Den ser bare
+    // det som skjer innenfor et par piksler, så en not blir mørk, men en
+    // eike kaster ingen skygge ned i lommen under. Ekte AO krever at hele
+    // scenen rendres til en dybdetekstur først, og den passen eier
+    // FreeCADs egen viewer.
+    float occlusion = 1.0;
+    if (cavity > 0.0) {
+        vec3 dpx = dFdx(vObjPos);
+        vec3 dpy = dFdy(vObjPos);
+        vec3 gn = normalize(vObjNormal);
+        vec3 dnx = dFdx(gn);
+        vec3 dny = dFdy(gn);
+        float k = dot(dnx, dpx) / max(dot(dpx, dpx), 1e-8)
+                + dot(dny, dpy) / max(dot(dpy, dpy), 1e-8);
+        occlusion = 1.0 - cavity * clamp(-k * cavityRadius, 0.0, 1.0);
+    }
+
+    vec3 nv = normalize(gl_NormalMatrix * n);
+    // 0.49 og ikke 0.5: ved silhuetten er |n.xy| ~ 1, og UV havner helt
+    // ytterst i teksturen. Da plukker filtreringen opp kanten og vi får
+    // striper langs konturen. En halv prosent margin fjerner det.
+    vec2 uv = nv.xy * 0.49 + 0.5;
+    vec3 c = texture2D(matcap, uv).rgb;
+    // tint > 0 blander inn objektets egen farge, slik at fargekoding
+    // fra modelltreet fortsatt er synlig.
+    c = mix(c, c * gl_Color.rgb * 2.0, tint);
+    // Okklusjonen legges på før skraveringen, slik at mørkere hjørner
+    // også får tettere streker. Det er slik en tegner ville gjort det.
+    c *= occlusion;
+
+    if (hatch > 0) {
+        // Fire soner etter lyshet, hver med sin teknikk:
+        //   mørkest      tette streker, krysset
+        //   nest mørkest samme strek, glissere
+        //   nest lysest  prikker
+        //   lysest       blankt papir
+        float lum = dot(c, vec3(0.299, 0.587, 0.114));
+        vec2 frag = gl_FragCoord.xy;
+
+        float e = 0.05;
+        float wDense = 1.0 - smoothstep(T_DARK - e, T_DARK + e, lum);
+        float wSparse = band(lum, T_DARK, T_MID, e);
+        float wDots = band(lum, T_MID, T_LIGHT, e);
+
+        float ink = 0.0;
+
+        if (wDense > 0.001) {
+            float weight = clamp((T_DARK - lum) / T_DARK, 0.0, 1.0);
+            // To retninger, ikke 90 grader fra hverandre. Kryssende
+            // streker i rett vinkel leser som rutenett, ikke som skygge.
+            float a = hatch_layer(frag, 0.62, hatchSpacing, weight);
+            float b = hatch_layer(frag, -0.70, hatchSpacing * 1.1, weight);
+            ink += wDense * max(a, b);
+        }
+        if (wSparse > 0.001) {
+            float weight = clamp((T_MID - lum) / (T_MID - T_DARK), 0.0, 1.0);
+            ink += wSparse * hatch_layer(frag, 0.62, hatchSpacing * 1.9,
+                                         weight * 0.7);
+        }
+        if (wDots > 0.001) {
+            float weight = clamp((T_LIGHT - lum) / (T_LIGHT - T_MID),
+                                 0.0, 1.0);
+            ink += wDots * dot_layer(frag, hatchSpacing * 1.25, weight);
+        }
+
+        c = mix(c, hatchInk, clamp(ink * hatchStrength, 0.0, 1.0));
+    }
+
+    gl_FragColor = vec4(c, 1.0);
+}
+"""
+
+# Blyantfarge. Grafitt er ikke svart, det er en kjølig mørk grå med
+# glans. Ren svart ser ut som tusj.
+GRAPHITE = (0.20, 0.20, 0.23)
+
+# Navn, modus, dybde og skala i perioder per millimeter.
+#
+# Alle overflatene er fysiske. Et verktøy vokser ikke med emnet: en 0,4 mm
+# dyse legger 0,2 mm lag enten delen er 1 cm eller 10 cm, og matingen på en
+# dreiebenk gir samme sporavstand uansett diameter. Derfor er tallene her
+# faktiske mål, og navnet sier hvilket.
+#
+# 1 / skala er perioden i millimeter: 10,0 er 0,1 mm mellom sporene.
+FINISHES = [
+    ("Ingen", 0, 0.00, 1.0),
+    ("Dreid 0,1 mm", 1, 0.22, 10.0),
+    ("Dreid 0,25 mm", 1, 0.30, 4.0),
+    # Blåsemedia gir korn på hundredeler, ikke tideler. 0,2 mm var for
+    # grovt til å hete sandblåst; det leste som støpt overflate.
+    ("Sandblåst 0,05 mm", 2, 0.16, 20.0),
+    ("Sandblåst 0,12 mm", 2, 0.22, 8.333),
+    ("Printlag 0,2 mm", 3, 0.28, 5.0),
+    ("Printlag 0,12 mm", 3, 0.24, 8.333),
+]
+
+# Hvilken overflate som foreslås for hver materialfamilie. Leire er matt
+# fra før og trenger ingen, metall tåler dreide riper, hard surface ser
+# riktig ut sandblåst.
+FINISH_DEFAULTS = {
+    "metal": "Dreid 0,1 mm",
+    "bl_metal": "Dreid 0,1 mm",
+    "plast": "Sandblåst 0,05 mm",
+    "print": "Printlag 0,2 mm",
+    "clay": "Ingen",
+    "bl_clay": "Ingen",
+    # Trinnene er poenget i en toon-matcap. Ruhet bryter dem opp og
+    # ødelegger de rene terminatorlinjene.
+    "toon": "Ingen",
+}
+
+
+def circular_icon(path, size=80):
+    """Miniatyr klippet til en sirkel.
+
+    Teksturen fyller hele ruta, for shaderen slår opp helt ut til
+    silhuetten. Det er riktig, men firkantede miniatyrer ser ut som
+    fargeovergagner og ikke som materialkuler. Maskeringen hører hjemme i
+    panelet, ikke i teksturen.
+    """
+    source = QtGui.QPixmap(path)
+    if source.isNull():
+        return QtGui.QIcon(path)
+    source = source.scaled(size, size, QtCore.Qt.IgnoreAspectRatio,
+                           QtCore.Qt.SmoothTransformation)
+    target = QtGui.QPixmap(size, size)
+    target.fill(QtCore.Qt.transparent)
+    painter = QtGui.QPainter(target)
+    painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+    clip = QtGui.QPainterPath()
+    clip.addEllipse(0.5, 0.5, size - 1.0, size - 1.0)
+    painter.setClipPath(clip)
+    painter.drawPixmap(0, 0, source)
+    painter.end()
+    return QtGui.QIcon(target)
+
+
+def matcap_files():
+    if not os.path.isdir(MATCAP_DIR):
+        return []
+    names = [f for f in sorted(os.listdir(MATCAP_DIR))
+             if f.lower().endswith((".png", ".jpg", ".jpeg"))]
+    return names
+
+
+# ------------------------------------------------------------- scenegraf
+
+def build_shader(path, tint, finish=0, amount=0.0, scale=1.0,
+                 hatch=0, spacing=6.0, strength=0.62,
+                 cavity=0.0, cavity_radius=0.8):
+    """Bygger en gruppe med tekstur + shaderprogram."""
+    group = coin.SoGroup()
+    group.setName("MatCapGroup")
+
+    tex = coin.SoTexture2()
+    tex.filename = str(path)
+    tex.model = coin.SoTexture2.REPLACE
+    # Coin bruker REPEAT som standard. Ved silhuetten ligger UV på 0 eller 1,
+    # og da wrapper oppslaget rundt til motsatt side av teksturen. Det er
+    # stripene langs kanten. CLAMP låser oppslaget til ytterste piksel.
+    tex.wrapS = coin.SoTexture2.CLAMP
+    tex.wrapT = coin.SoTexture2.CLAMP
+    group.addChild(tex)
+
+    program = coin.SoShaderProgram()
+
+    vs = coin.SoVertexShader()
+    vs.sourceType = coin.SoShaderObject.GLSL_PROGRAM
+    vs.sourceProgram = VERTEX_SRC
+
+    fs = coin.SoFragmentShader()
+    fs.sourceType = coin.SoShaderObject.GLSL_PROGRAM
+    fs.sourceProgram = FRAGMENT_SRC
+
+    sampler = coin.SoShaderParameter1i()
+    sampler.name = "matcap"
+    sampler.value = 0
+
+    tint_param = coin.SoShaderParameter1f()
+    tint_param.name = "tint"
+    tint_param.value = float(tint)
+
+    finish_param = coin.SoShaderParameter1i()
+    finish_param.name = "finish"
+    finish_param.value = int(finish)
+
+    amount_param = coin.SoShaderParameter1f()
+    amount_param.name = "finishAmount"
+    amount_param.value = float(amount)
+
+    scale_param = coin.SoShaderParameter1f()
+    scale_param.name = "finishScale"
+    # Null her ville gitt divisjon på null i differansetrinnet.
+    scale_param.value = max(0.01, float(scale))
+
+    hatch_param = coin.SoShaderParameter1i()
+    hatch_param.name = "hatch"
+    hatch_param.value = int(hatch)
+
+    spacing_param = coin.SoShaderParameter1f()
+    spacing_param.name = "hatchSpacing"
+    # Strekavstanden er i fysiske piksler, så den må ganges opp på en
+    # skjerm med høyt pikselforhold, ellers blir skraveringen dobbelt så
+    # tett der som ellers.
+    spacing_param.value = max(1.5, float(spacing) * device_pixel_ratio())
+
+    strength_param = coin.SoShaderParameter1f()
+    strength_param.name = "hatchStrength"
+    strength_param.value = float(strength)
+
+    ink_param = coin.SoShaderParameter3f()
+    ink_param.name = "hatchInk"
+    ink_param.value = coin.SbVec3f(*GRAPHITE)
+
+    cavity_param = coin.SoShaderParameter1f()
+    cavity_param.name = "cavity"
+    cavity_param.value = float(cavity)
+
+    radius_param = coin.SoShaderParameter1f()
+    radius_param.name = "cavityRadius"
+    radius_param.value = max(0.01, float(cavity_radius))
+
+    for i, param in enumerate((sampler, tint_param, finish_param,
+                               amount_param, scale_param, hatch_param,
+                               spacing_param, strength_param, ink_param,
+                               cavity_param, radius_param)):
+        fs.parameter.set1Value(i, param)
+
+    program.shaderObject.set1Value(0, vs)
+    program.shaderObject.set1Value(1, fs)
+    group.addChild(program)
+
+    return group
+
+
+# Shaderen skal ikke i SwitchNode. Det er en SoSwitch der whichChild peker
+# på gjeldende visningsmodus, og et nytt barn forskyver indeksen slik at
+# objektet forsvinner.
+#
+# Den skal heller ikke i RootNode, for da treffer den kantlinjene også.
+# I stedet finner vi separatorene som inneholder flategeometrien og legger
+# shaderen der. Hver separator avgrenser tilstanden sin, så kanter og
+# punkter beholder sine egne farger. Det er slik vi får tynne mørke
+# konturlinjer over et shadet materiale.
+
+# Solider bruker SoBrepFaceSet, mesh-objekter SoFCIndexedFaceSet. Begge
+# må med, ellers virker makroen bare på det ene.
+FACE_SETS = ("SoBrepFaceSet", "SoFCIndexedFaceSet", "IndexedFaceSet",
+             "FaceSet", "SoIndexedFaceSet", "SoFCIndexedFaceSetElement")
+
+
+def face_parents(node, found=None, depth=0):
+    """Separatorene som direkte inneholder et flate-sett."""
+    if found is None:
+        found = []
+    if depth > 12:
+        return found
+    try:
+        n = node.getNumChildren()
+    except Exception:
+        return found
+    for i in range(n):
+        child = node.getChild(i)
+        if str(child.getTypeId().getName()) in FACE_SETS:
+            if node not in found:
+                found.append(node)
+        else:
+            face_parents(child, found, depth + 1)
+    return found
+
+
+def shader_hosts(view_object):
+    """Nodene shaderen skal inn i for dette objektet.
+
+    Vi går gjennom alle visningsmodusene, ikke bare den aktive, slik at
+    materialet blir stående når man bytter mellom Flat Lines og Shaded.
+    """
+    try:
+        switch = view_object.SwitchNode
+    except Exception:
+        switch = view_object.RootNode
+    return face_parents(switch)
+
+
+def root_of(view_object):
+    return view_object.RootNode
+
+
+def device_pixel_ratio():
+    """Hvor mange fysiske piksler skjermen bruker per logiske piksel.
+
+    LineWidth i Coin teller fysiske piksler. På en skjerm med forhold 2,
+    altså de fleste moderne, gir LineWidth = 1 en strek på en halv logisk
+    piksel. Den forsvinner delvis, og kantene ser stiplete ut der de
+    krysser trekantkanter. Vi ganger opp, så 1,0 i panelet alltid betyr
+    én synlig piksel.
+    """
+    for getter in (lambda: Gui.getMainWindow().devicePixelRatio(),
+                   lambda: QtGui.QApplication.instance().devicePixelRatio()):
+        try:
+            ratio = float(getter())
+        except Exception:
+            continue
+        if ratio >= 1.0:
+            return ratio
+    return 1.0
+
+
+
+
+def find_matcap_group(node):
+    for i in range(node.getNumChildren()):
+        child = node.getChild(i)
+        if isinstance(child, coin.SoGroup) and child.getName() == "MatCapGroup":
+            return i, child
+    return None, None
+
+
+def apply_to(view_object, path, tint, line_color=None, line_width=None,
+             finish=0, amount=0.0, scale=1.0,
+             hatch=0, spacing=6.0, strength=0.62,
+             cavity=0.0, cavity_radius=0.8):
+    remove_from(view_object)
+    hosts = shader_hosts(view_object)
+    for host in hosts:
+        host.insertChild(build_shader(path, tint, finish, amount, scale,
+                                      hatch, spacing, strength,
+                                      cavity, cavity_radius), 0)
+    if line_color is not None:
+        try:
+            view_object.LineColor = line_color
+        except Exception:
+            pass
+    if line_width is not None:
+        try:
+            view_object.LineWidth = float(line_width) * device_pixel_ratio()
+        except Exception:
+            pass
+    return len(hosts)
+
+
+def remove_from(view_object):
+    removed = 0
+    for host in shader_hosts(view_object) + [root_of(view_object)]:
+        while True:
+            idx, group = find_matcap_group(host)
+            if group is None:
+                break
+            host.removeChild(idx)
+            removed += 1
+    return removed
+
+
+def targets():
+    sel = [o for o in Gui.Selection.getSelection() if hasattr(o, "ViewObject")]
+    if sel:
+        return sel
+    doc = FreeCAD.ActiveDocument
+    if doc is None:
+        return []
+    # Origin-planer og akser har Shape, men skal ikke shades. Skjulte
+    # features inne i en Body faller bort på Visibility.
+    return [o for o in doc.Objects
+            if (hasattr(o, "Shape") or hasattr(o, "Mesh"))
+            and not o.TypeId.startswith("App::")
+            and getattr(o.ViewObject, "Visibility", False)]
+
+
+# ------------------------------------------------------------------- GUI
+
+class MatCapPanel(QtGui.QWidget):
+
+    def __init__(self):
+        super(MatCapPanel, self).__init__()
+        self.setWindowTitle("MatCap")
+        self.setWindowFlags(QtCore.Qt.Tool)
+
+        layout = QtGui.QVBoxLayout(self)
+        layout.setSpacing(8)
+
+        self.list = QtGui.QListWidget()
+        self.list.setViewMode(QtGui.QListView.IconMode)
+        self.list.setIconSize(QtCore.QSize(80, 80))
+        self.list.setGridSize(QtCore.QSize(96, 104))
+        self.list.setResizeMode(QtGui.QListView.Adjust)
+        self.list.setMovement(QtGui.QListView.Static)
+        self.list.setWordWrap(True)
+        self.list.setSpacing(2)
+        self.list.setMinimumHeight(230)
+        self.list.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        for name in matcap_files():
+            path = os.path.join(MATCAP_DIR, name)
+            label = os.path.splitext(name)[0]
+            # Prefikset sier hvor teksturen kommer fra, ikke hva den er.
+            # I listen er det bare støy, så det vises som verktøytips.
+            item = QtGui.QListWidgetItem(circular_icon(path),
+                                         label.replace("bl_", "")
+                                              .replace("_", " "))
+            item.setData(QtCore.Qt.UserRole, path)
+            item.setToolTip(label)
+            self.list.addItem(item)
+        if self.list.count():
+            self.list.setCurrentRow(0)
+        layout.addWidget(self.list, 1)
+
+        form = QtGui.QFormLayout()
+        form.setLabelAlignment(QtCore.Qt.AlignRight)
+        form.setSpacing(6)
+
+        surf = QtGui.QHBoxLayout()
+        self.finish = QtGui.QComboBox()
+        for entry in FINISHES:
+            self.finish.addItem(entry[0])
+        self.finish.setToolTip(
+            "Prosedyrisk ruhet. Målene er fysiske: verktøyet vokser ikke "
+            "med emnet, så en 0,2 mm lagstreng er 0,2 mm uansett størrelse.")
+        surf.addWidget(self.finish, 1)
+        self.auto_finish = QtGui.QCheckBox("Auto")
+        self.auto_finish.setChecked(True)
+        self.auto_finish.setToolTip(
+            "Velger overflate etter materialet: metall dreid, "
+            "hard surface sandblåst, leire glatt, printplast lagvis.")
+        surf.addWidget(self.auto_finish)
+        form.addRow("Overflate", surf)
+
+        self.finish_amount = QtGui.QSlider(QtCore.Qt.Horizontal)
+        self.finish_amount.setRange(0, 200)
+        self.finish_amount.setValue(100)
+        self.finish_amount.setToolTip("100 er normalverdien for valgt overflate.")
+        form.addRow("Dybde", self.finish_amount)
+
+        self.tint = QtGui.QSlider(QtCore.Qt.Horizontal)
+        self.tint.setRange(0, 100)
+        self.tint.setValue(0)
+        self.tint.setToolTip(
+            "Blander inn objektets egen farge, så fargekoding fra "
+            "modelltreet fortsatt er synlig.")
+        form.addRow("Objektfarge", self.tint)
+
+        self.cavity = QtGui.QSlider(QtCore.Qt.Horizontal)
+        self.cavity.setRange(0, 100)
+        self.cavity.setValue(45)
+        self.cavity.setToolTip(
+            "Mørkere i hjørner og noter. Dette er kavitetsskygge, ikke "
+            "ekte ambient occlusion: den ser bare et par piksler ut, så "
+            "en eike kaster ingen skygge ned i lommen under.")
+        form.addRow("Fordypninger", self.cavity)
+
+        pencil = QtGui.QHBoxLayout()
+        self.hatch = QtGui.QCheckBox("Blyant")
+        self.hatch.setToolTip(
+            "Skravering i skjermrom. Mørke partier får flere lag i nye "
+            "retninger, slik man faktisk skraverer.")
+        pencil.addWidget(self.hatch)
+        self.hatch_spacing = QtGui.QDoubleSpinBox()
+        self.hatch_spacing.setRange(2.0, 20.0)
+        self.hatch_spacing.setSingleStep(0.5)
+        self.hatch_spacing.setValue(6.0)
+        self.hatch_spacing.setSuffix(" px")
+        self.hatch_spacing.setToolTip("Avstand mellom strekene.")
+        pencil.addWidget(self.hatch_spacing)
+        pencil.addStretch(1)
+        form.addRow("Skravering", pencil)
+
+        edges = QtGui.QHBoxLayout()
+        self.dark_edges = QtGui.QCheckBox("Mørke")
+        self.dark_edges.setChecked(True)
+        self.dark_edges.setToolTip(
+            "Tegner kantene i mørk grå i stedet for objektets farge, "
+            "slik Fusion gjør det.")
+        edges.addWidget(self.dark_edges)
+        self.line_width = QtGui.QDoubleSpinBox()
+        self.line_width.setRange(0.5, 5.0)
+        self.line_width.setSingleStep(0.5)
+        self.line_width.setValue(1.0)
+        self.line_width.setSuffix(" px")
+        self.line_width.setToolTip(
+            "Logiske piksler. Verdien ganges med skjermens pikselforhold, "
+            "så 1,00 gir én synlig piksel også på en Retina-skjerm.")
+        edges.addWidget(self.line_width)
+        edges.addStretch(1)
+        form.addRow("Kantlinjer", edges)
+
+        layout.addLayout(form)
+
+        buttons = QtGui.QHBoxLayout()
+        self.apply_btn = QtGui.QPushButton("Bruk på nytt utvalg")
+        self.apply_btn.setToolTip(
+            "Alt slår inn med én gang. Denne trengs bare når du har "
+            "markert andre objekter og vil gi dem samme materiale.")
+        clear_btn = QtGui.QPushButton("Fjern")
+        buttons.addWidget(self.apply_btn)
+        buttons.addWidget(clear_btn)
+        layout.addLayout(buttons)
+
+        self.status = QtGui.QLabel("")
+        layout.addWidget(self.status)
+
+        # Glidebryterne sender én verdi per piksel musa flyttes. Uten en
+        # liten forsinkelse ville hver av dem bygget scenegrafen på nytt,
+        # og panelet føltes tregt selv om selve shaderen er rask.
+        self._pending = QtCore.QTimer(self)
+        self._pending.setSingleShot(True)
+        self._pending.setInterval(90)
+        self._pending.timeout.connect(self.on_apply)
+
+        self.apply_btn.clicked.connect(self.on_apply)
+        clear_btn.clicked.connect(self.on_clear)
+
+        # Ett klikk, ikke to. Materialet skal skifte i det du peker på det.
+        self.list.currentItemChanged.connect(self.on_material_picked)
+        self.list.itemClicked.connect(self.on_material_picked)
+
+        self.finish.currentIndexChanged.connect(self.on_finish_picked)
+        self.auto_finish.toggled.connect(self.on_material_picked)
+        self.dark_edges.toggled.connect(self.schedule)
+        self.line_width.valueChanged.connect(self.schedule)
+        self.tint.valueChanged.connect(self.schedule)
+        self.finish_amount.valueChanged.connect(self.schedule)
+        self.cavity.valueChanged.connect(self.schedule)
+        self.hatch.toggled.connect(self.schedule)
+        self.hatch_spacing.valueChanged.connect(self.schedule)
+
+        self.sync_auto_finish()
+
+        if not matcap_files():
+            self.status.setText("Fant ingen teksturer i %s" % MATCAP_DIR)
+
+    def current_path(self):
+        item = self.list.currentItem()
+        return item.data(QtCore.Qt.UserRole) if item else None
+
+    def sync_auto_finish(self, *args):
+        """Setter overflaten etter hvilken materialfamilie som er valgt."""
+        if not self.auto_finish.isChecked():
+            return
+        item = self.list.currentItem()
+        if item is None:
+            return
+        # Etiketten i listen er renset for prefiks, så den kan ikke brukes
+        # til å kjenne igjen familien. Verktøytipset har originalnavnet.
+        stem = item.toolTip() or item.text()
+        for prefix, wanted in FINISH_DEFAULTS.items():
+            if stem.startswith(prefix):
+                index = self.finish.findText(wanted)
+                if index >= 0 and index != self.finish.currentIndex():
+                    self.finish.blockSignals(True)
+                    self.finish.setCurrentIndex(index)
+                    self.finish.blockSignals(False)
+                return
+
+    def schedule(self, *args):
+        """Ber om en oppdatering straks, men ikke flere enn nødvendig."""
+        self._pending.start()
+
+    def on_material_picked(self, *args):
+        self.sync_auto_finish()
+        self.schedule()
+
+    def on_finish_picked(self, *args):
+        # Velger man overflate for hånd, skal ikke automatikken overstyre.
+        # blockSignals her, ellers ville avkryssingen utløst en ny runde.
+        self.auto_finish.blockSignals(True)
+        self.auto_finish.setChecked(False)
+        self.auto_finish.blockSignals(False)
+        self.schedule()
+
+    def finish_settings(self):
+        name, mode, amount, scale = FINISHES[self.finish.currentIndex()]
+        return mode, amount * self.finish_amount.value() / 100.0, scale
+
+    def on_apply(self, *args):
+        self._pending.stop()
+        path = self.current_path()
+        if not path:
+            return
+        objs = targets()
+        tint = self.tint.value() / 100.0
+        color = DARK_EDGE if self.dark_edges.isChecked() else None
+        width = self.line_width.value()
+        mode, amount, scale = self.finish_settings()
+        layers = 1 if self.hatch.isChecked() else 0
+        hosts = 0
+        for o in objs:
+            try:
+                hosts += apply_to(o.ViewObject, path, tint, color, width,
+                                  mode, amount, scale,
+                                  layers, self.hatch_spacing.value(), 0.62,
+                                  self.cavity.value() / 100.0)
+            except Exception as exc:
+                FreeCAD.Console.PrintError("MatCap: %s: %s\n" % (o.Name, exc))
+        if not objs:
+            self.status.setText("Ingenting å legge det på")
+            return
+        names = objs[0].Label if len(objs) == 1 else "%d objekter" % len(objs)
+        self.status.setText(
+            "%s, %s  →  %s"
+            % (os.path.splitext(os.path.basename(path))[0],
+               self.finish.currentText().lower(), names))
+
+    def on_clear(self):
+        objs = targets()
+        n = sum(1 for o in objs if remove_from(o.ViewObject))
+        self.status.setText("Fjernet fra %d objekt(er)" % n)
+
+
+def show():
+    global _matcap_panel
+    try:
+        _matcap_panel.close()
+    except Exception:
+        pass
+    _matcap_panel = MatCapPanel()
+    _matcap_panel.show()
+    return _matcap_panel
+
+
+if __name__ == "__main__":
+    show()

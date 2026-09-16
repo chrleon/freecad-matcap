@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"
+     viewBox="0 0 64 64">
+  <defs>
+    <!-- Selve poenget med en matcap: en kule som bærer materialet. -->
+    <radialGradient id="ball" cx="36%" cy="28%" r="78%">
+      <stop offset="0%" stop-color="#fdfdfb"/>
+      <stop offset="34%" stop-color="#cdd6e2"/>
+      <stop offset="62%" stop-color="#8b98ab"/>
+      <stop offset="100%" stop-color="#3b4350"/>
+    </radialGradient>
+    <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="disc">
+      <circle cx="32" cy="32" r="26"/>
+    </clipPath>
+  </defs>
+
+  <circle cx="32" cy="32" r="27.5" fill="#20242c"/>
+  <circle cx="32" cy="32" r="26" fill="url(#ball)"/>
+
+  <!-- Horisontstripa, det som gjør at en kule leser som metall -->
+  <g clip-path="url(#disc)">
+    <rect x="6" y="33" width="52" height="7" fill="url(#floor)"/>
+    <ellipse cx="23" cy="19" rx="6" ry="4.5" fill="#ffffff"
+             opacity="0.85" transform="rotate(-18 23 19)"/>
+  </g>
+
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#11141a"
+          stroke-width="1.5" opacity="0.6"/>
+</svg>
