@@ -1,0 +1,15 @@
+Teksturene i denne mappen er CC0 / public domain.
+
+Det gjelder alle sammen, så de kan brukes fritt også utenfor denne
+addonen, i andre programmer eller i egne prosjekter, uten kreditering.
+
+  bl_clay_studio.png
+  bl_metal_full.png
+      Fra Blenders sculpt-matcaps, utgitt som CC0 av Blender Foundation
+      og Blender-fellesskapet. Konvertert fra lineær EXR til sRGB-PNG med
+      import_blender_matcaps.py i dette prosjektet.
+
+  alle øvrige
+      Laget med make_matcaps.py i dette prosjektet, og utgitt som CC0.
+
+Koden i addonen har egen lisens, MIT, se LICENSE i rotmappen.

@@ -19,18 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-
-----------------------------------------------------------------------
-Teksturene i matcaps/
-
-Alle teksturene er CC0 / public domain.
-
-  bl_clay_studio.png, bl_metal_full.png
-      Fra Blenders sculpt-matcaps, som er utgitt som CC0 av Blender
-      Foundation og Blender-fellesskapet. Konvertert fra EXR til sRGB-PNG
-      med import_blender_matcaps.py.
-
-  alle øvrige
-      Laget med make_matcaps.py i dette prosjektet. Utgitt som CC0, så de
-      kan brukes fritt også utenfor denne addonen.
