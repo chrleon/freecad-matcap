@@ -28,7 +28,7 @@ __Name__ = "MatCap"
 __Comment__ = ("Matcap-materialer, overflateruhet, kavitetsskygge og "
                "blyantskravering rett i 3D-visningen")
 __Author__ = "Christian Leon"
-__Version__ = "1.1.0"
+__Version__ = "1.2.0"
 __Date__ = "2026-09-17"
 __License__ = "MIT"
 __Web__ = "https://github.com/chrleon/freecad-matcap"
@@ -338,35 +338,16 @@ GRAPHITE = (0.20, 0.20, 0.23)
 # faktiske mål, og navnet sier hvilket.
 #
 # 1 / skala er perioden i millimeter: 10,0 er 0,1 mm mellom sporene.
-FINISHES = [
-    ("Ingen", 0, 0.00, 1.0),
-    ("Dreid 0,1 mm", 1, 0.22, 10.0),
-    ("Dreid 0,25 mm", 1, 0.30, 4.0),
-    # Blåsemedia gir korn på hundredeler, ikke tideler. 0,2 mm var for
-    # grovt til å hete sandblåst; det leste som støpt overflate.
-    ("Sandblåst 0,05 mm", 2, 0.16, 20.0),
-    ("Sandblåst 0,12 mm", 2, 0.22, 8.333),
-    ("Printlag 0,2 mm", 3, 0.28, 5.0),
-    ("Printlag 0,12 mm", 3, 0.24, 8.333),
-]
+# Shaderen kan fortsatt dreid (1) og printlag (3); de er bare ikke
+# eksponert. Ett godt valg slår fire middelmådige, og sandblåst er det
+# ene som kler både metall og plast. Vil du ha de andre tilbake, legg dem
+# inn her igjen.
+TEXTURE = (2, 0.16, 20.0)   # modus, dybde, perioder per millimeter
 
-# Hvilken overflate som foreslås for hver materialfamilie. Leire er matt
-# fra før og trenger ingen, metall tåler dreide riper, hard surface ser
-# riktig ut sandblåst.
-FINISH_DEFAULTS = {
-    # Mer spesifikke prefikser først. Oppslaget tar første treff, så
-    # "metal_anodised" må stå over "metal", ellers blir den dreid.
-    "metal_anodised": "Sandblåst 0,05 mm",
-    "metal": "Dreid 0,1 mm",
-    "bl_metal": "Dreid 0,1 mm",
-    "plast": "Sandblåst 0,05 mm",
-    "print": "Printlag 0,2 mm",
-    "clay": "Ingen",
-    "bl_clay": "Ingen",
-    # Trinnene er poenget i en toon-matcap. Ruhet bryter dem opp og
-    # ødelegger de rene terminatorlinjene.
-    "toon": "Ingen",
-}
+# Materialfamilier som skal ha tekstur på fra start. Leire er matt fra
+# før, og trinnene i en toon-matcap brytes opp av ruhet.
+TEXTURE_ON = ("metal", "bl_metal", "plast", "print")
+
 
 
 def circular_icon(path, size=80):
@@ -627,6 +608,24 @@ def targets():
 
 # ------------------------------------------------------------------- GUI
 
+class SelectionWatcher(object):
+    """Gir panelet beskjed når utvalget endrer seg.
+
+    Dette er det som gjør Bruk-knappen overflødig: markerer du noe nytt
+    i modelltreet, legger materialet seg på med én gang.
+
+    Bare addSelection er hektet på. Tømmer man utvalget, gjør vi
+    ingenting; ellers ville et klikk i tomrommet plutselig lagt
+    materialet på alt som er synlig i dokumentet.
+    """
+
+    def __init__(self, panel):
+        self.panel = panel
+
+    def addSelection(self, doc, obj, sub, point):
+        self.panel.schedule()
+
+
 class MatCapPanel(QtGui.QWidget):
 
     def __init__(self):
@@ -666,26 +665,16 @@ class MatCapPanel(QtGui.QWidget):
         form.setLabelAlignment(QtCore.Qt.AlignRight)
         form.setSpacing(6)
 
-        surf = QtGui.QHBoxLayout()
-        self.finish = QtGui.QComboBox()
-        for entry in FINISHES:
-            self.finish.addItem(entry[0])
-        self.finish.setToolTip(
-            "Prosedyrisk ruhet. Målene er fysiske: verktøyet vokser ikke "
-            "med emnet, så en 0,2 mm lagstreng er 0,2 mm uansett størrelse.")
-        surf.addWidget(self.finish, 1)
-        self.auto_finish = QtGui.QCheckBox("Auto")
-        self.auto_finish.setChecked(True)
-        self.auto_finish.setToolTip(
-            "Velger overflate etter materialet: metall dreid, "
-            "hard surface sandblåst, leire glatt, printplast lagvis.")
-        surf.addWidget(self.auto_finish)
-        form.addRow("Overflate", surf)
+        self.texture = QtGui.QCheckBox("Sandblåst 0,05 mm")
+        self.texture.setToolTip(
+            "Prosedyrisk ruhet, regnet i emnets eget koordinatsystem. "
+            "Målet er fysisk: kornet er 0,05 mm uansett hvor stor delen er.")
+        form.addRow("Tekstur", self.texture)
 
         self.finish_amount = QtGui.QSlider(QtCore.Qt.Horizontal)
         self.finish_amount.setRange(0, 200)
         self.finish_amount.setValue(100)
-        self.finish_amount.setToolTip("100 er normalverdien for valgt overflate.")
+        self.finish_amount.setToolTip("100 er normaldybden.")
         form.addRow("Dybde", self.finish_amount)
 
         self.tint = QtGui.QSlider(QtCore.Qt.Horizontal)
@@ -742,15 +731,12 @@ class MatCapPanel(QtGui.QWidget):
 
         layout.addLayout(form)
 
-        buttons = QtGui.QHBoxLayout()
-        self.apply_btn = QtGui.QPushButton("Bruk på nytt utvalg")
-        self.apply_btn.setToolTip(
-            "Alt slår inn med én gang. Denne trengs bare når du har "
-            "markert andre objekter og vil gi dem samme materiale.")
-        clear_btn = QtGui.QPushButton("Fjern")
-        buttons.addWidget(self.apply_btn)
-        buttons.addWidget(clear_btn)
-        layout.addLayout(buttons)
+        # Ingen Bruk-knapp. Alt slår inn med én gang, og utvalget
+        # fanges opp av en observatør, så knappen hadde ikke hatt noe å
+        # gjøre. Fjern blir stående: den er den eneste veien tilbake til
+        # FreeCADs egen visning.
+        clear_btn = QtGui.QPushButton("Fjern materiale")
+        layout.addWidget(clear_btn)
 
         self.status = QtGui.QLabel("")
         layout.addWidget(self.status)
@@ -763,15 +749,13 @@ class MatCapPanel(QtGui.QWidget):
         self._pending.setInterval(90)
         self._pending.timeout.connect(self.on_apply)
 
-        self.apply_btn.clicked.connect(self.on_apply)
         clear_btn.clicked.connect(self.on_clear)
 
         # Ett klikk, ikke to. Materialet skal skifte i det du peker på det.
         self.list.currentItemChanged.connect(self.on_material_picked)
         self.list.itemClicked.connect(self.on_material_picked)
 
-        self.finish.currentIndexChanged.connect(self.on_finish_picked)
-        self.auto_finish.toggled.connect(self.on_material_picked)
+        self.texture.toggled.connect(self.schedule)
         self.dark_edges.toggled.connect(self.schedule)
         self.line_width.valueChanged.connect(self.schedule)
         self.tint.valueChanged.connect(self.schedule)
@@ -782,31 +766,29 @@ class MatCapPanel(QtGui.QWidget):
 
         self.sync_auto_finish()
 
+        self._watcher = SelectionWatcher(self)
+        try:
+            Gui.Selection.addObserver(self._watcher)
+        except Exception:
+            self._watcher = None
+
         if not matcap_files():
             self.status.setText("Fant ingen teksturer i %s" % MATCAP_DIR)
+
+    def closeEvent(self, event):
+        # Observatøren lever i FreeCAD, ikke i vinduet. Uten dette blir
+        # den liggende igjen og peke på et panel som er borte.
+        if getattr(self, "_watcher", None) is not None:
+            try:
+                Gui.Selection.removeObserver(self._watcher)
+            except Exception:
+                pass
+            self._watcher = None
+        super(MatCapPanel, self).closeEvent(event)
 
     def current_path(self):
         item = self.list.currentItem()
         return item.data(QtCore.Qt.UserRole) if item else None
-
-    def sync_auto_finish(self, *args):
-        """Setter overflaten etter hvilken materialfamilie som er valgt."""
-        if not self.auto_finish.isChecked():
-            return
-        item = self.list.currentItem()
-        if item is None:
-            return
-        # Etiketten i listen er renset for prefiks, så den kan ikke brukes
-        # til å kjenne igjen familien. Verktøytipset har originalnavnet.
-        stem = item.toolTip() or item.text()
-        for prefix, wanted in FINISH_DEFAULTS.items():
-            if stem.startswith(prefix):
-                index = self.finish.findText(wanted)
-                if index >= 0 and index != self.finish.currentIndex():
-                    self.finish.blockSignals(True)
-                    self.finish.setCurrentIndex(index)
-                    self.finish.blockSignals(False)
-                return
 
     def schedule(self, *args):
         """Ber om en oppdatering straks, men ikke flere enn nødvendig."""
@@ -816,16 +798,22 @@ class MatCapPanel(QtGui.QWidget):
         self.sync_auto_finish()
         self.schedule()
 
-    def on_finish_picked(self, *args):
-        # Velger man overflate for hånd, skal ikke automatikken overstyre.
-        # blockSignals her, ellers ville avkryssingen utløst en ny runde.
-        self.auto_finish.blockSignals(True)
-        self.auto_finish.setChecked(False)
-        self.auto_finish.blockSignals(False)
-        self.schedule()
+    def sync_auto_finish(self, *args):
+        """Slår teksturen på eller av etter materialfamilien."""
+        item = self.list.currentItem()
+        if item is None:
+            return
+        # Etiketten i listen er renset for prefiks, så den kan ikke brukes
+        # til å kjenne igjen familien. Verktøytipset har originalnavnet.
+        stem = item.toolTip() or item.text()
+        self.texture.blockSignals(True)
+        self.texture.setChecked(stem.startswith(TEXTURE_ON))
+        self.texture.blockSignals(False)
 
     def finish_settings(self):
-        name, mode, amount, scale = FINISHES[self.finish.currentIndex()]
+        if not self.texture.isChecked():
+            return 0, 0.0, 1.0
+        mode, amount, scale = TEXTURE
         return mode, amount * self.finish_amount.value() / 100.0, scale
 
     def on_apply(self, *args):
@@ -852,10 +840,10 @@ class MatCapPanel(QtGui.QWidget):
             self.status.setText("Ingenting å legge det på")
             return
         names = objs[0].Label if len(objs) == 1 else "%d objekter" % len(objs)
-        self.status.setText(
-            "%s, %s  →  %s"
-            % (os.path.splitext(os.path.basename(path))[0],
-               self.finish.currentText().lower(), names))
+        tekst = os.path.splitext(os.path.basename(path))[0]
+        if self.texture.isChecked():
+            tekst += " med tekstur"
+        self.status.setText("%s  →  %s" % (tekst, names))
 
     def on_clear(self):
         objs = targets()

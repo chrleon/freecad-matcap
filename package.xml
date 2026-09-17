@@ -8,7 +8,7 @@
     modellerer. I tillegg prosedyrisk overflateruhet med fysiske mål,
     kavitetsskygge i fordypninger, og blyantskravering i fire trinn.
   </description>
-  <version>1.1.0</version>
+  <version>1.2.0</version>
   <date>2026-09-17</date>
 
   <maintainer email="christian.christensen@scaleaq.com">Christian Leon</maintainer>
@@ -25,7 +25,7 @@
     <macro>
       <name>MatCap</name>
       <description>Matcap-materialer, overflate og skravering i 3D-visningen</description>
-      <version>1.1.0</version>
+      <version>1.2.0</version>
       <icon>MatCap.svg</icon>
       <subdirectory>./</subdirectory>
       <files>

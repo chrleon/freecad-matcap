@@ -143,10 +143,17 @@ det uansett hvordan lysene flyttes.
 **Execute**. Panelet kommer som et eget vindu og kan stå åpent mens du
 jobber.
 
-Alt slår inn med én gang. Ett klikk på et materiale bytter det, og
-glidebryterne oppdaterer mens du drar. Uten markering behandles alle
-synlige objekter i dokumentet; med markering bare dem. Knappen nederst
-trengs bare når du har markert noe nytt og vil gi det samme materiale.
+Alt slår inn med én gang. Ett klikk på et materiale bytter det,
+glidebryterne oppdaterer mens du drar, og markerer du noe nytt i
+modelltreet følger materialet med. Uten markering behandles alle synlige
+objekter i dokumentet.
+
+Derfor er det ingen Bruk-knapp. Den eneste knappen er Fjern, som er den
+eneste veien tilbake til FreeCADs egen visning.
+
+Utvalget fanges opp av en observatør som bare lytter på `addSelection`.
+Tømmer man utvalget skjer ingenting; ellers ville et klikk i tomrommet
+plutselig lagt materialet på alt som er synlig.
 
 Glidebryterne er dempet med 90 ms. De sender én verdi per piksel musa
 flyttes, og uten forsinkelsen ville scenegrafen blitt bygget på nytt for
@@ -217,19 +224,18 @@ normal får samme farge, så en jevn flate blir jevn. Derfor forstyrres
 normalen først, per piksel, og matcapen slås opp etterpå. Det er nøyaktig
 det et normal map gjør, bare regnet ut i stedet for lest fra en tekstur.
 
-| Overflate | Hva den gjør |
-| --- | --- |
-| Dreid 0,1 / 0,25 mm | Ringer rundt emnet med ujevn avstand, som en dreid flate |
-| Sandblåst 0,05 / 0,12 mm | Isotropisk ruhet, like grov i alle retninger |
-| Printlag 0,2 / 0,12 mm | Avrundede vulster, én per lagtykkelse |
+Teksturen er sandblåst med 0,05 mm korn. Den er en avkryssing, ikke en
+meny: ett godt valg slår fire middelmådige, og dette ene kler både metall
+og plast. Automatikken slår den på for metall, plast og printplast, og lar
+leire og de trinnvise materialene stå glatte.
 
-**Alle målene er fysiske, ikke relative til emnet.** Verktøyet vokser ikke
-med delen: en 0,4 mm dyse legger 0,2 mm lag enten emnet er 1 cm eller 10 cm,
-og matingen på en dreiebenk gir samme sporavstand uansett diameter. Derfor
-er skalaen perioder per millimeter, og navnet i menyen er selve målet.
+**Målet er fysisk, ikke relativt til emnet.** Verktøyet vokser ikke med
+delen: blåsemedia gir samme korn enten emnet er 1 cm eller 10 cm. Derfor er
+skalaen perioder per millimeter.
 
-Dette var galt i første omgang. Mønsteret skalerte med emnets diagonal, noe
-som ser plausibelt ut helt til man tenker på hvor mønsteret kommer fra.
+Shaderen kan fortsatt dreide ringer og printlag, modus 1 og 3, men de er
+ikke lenger i grensesnittet. Vil du ha dem tilbake, står de i `TEXTURE`
+øverst i makroen.
 
 ### Måling av skalaen
 
@@ -237,6 +243,9 @@ Påstanden om millimeter er verdiløs uten en måling, så `verify_scale.py`
 gjør den. En kube på nøyaktig 10 mm sett rett forfra: kubens høyde i piksler
 gir målestokken, og antall lysheteopper nedover en kolonne gir antall
 perioder.
+
+Tabellen er fra da alle seks var i menyen. Bare den øverste er
+eksponert nå, men shaderen kan fortsatt resten.
 
 ```
 overflate                nominelt       målt    px/mm

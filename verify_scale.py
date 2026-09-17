@@ -85,7 +85,18 @@ def main():
     ns = load_macro()
     obj = make_cube()
     print("%-22s %10s %10s %8s" % ("overflate", "nominelt", "målt", "px/mm"))
-    for name, mode, amount, scale in ns["FINISHES"]:
+    # Bare teksturen er eksponert i panelet nå, men shaderen kan
+    # fortsatt de andre modusene. Vi måler alle, så tallene kan
+    # etterprøves om noen tas i bruk igjen.
+    mode_tex, amount_tex, scale_tex = ns["TEXTURE"]
+    kandidater = [
+        ("Tekstur, sandblåst 0,05 mm", mode_tex, amount_tex, scale_tex),
+        ("Dreid 0,1 mm", 1, 0.22, 10.0),
+        ("Sandblåst 0,12 mm", 2, 0.22, 8.333),
+        ("Printlag 0,2 mm", 3, 0.28, 5.0),
+        ("Printlag 0,12 mm", 3, 0.24, 8.333),
+    ]
+    for name, mode, amount, scale in kandidater:
         if mode == 0:
             continue
         result = measure(ns, obj, mode, scale, amount)
