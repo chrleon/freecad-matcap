@@ -8,8 +8,8 @@
     modellerer. I tillegg prosedyrisk overflateruhet med fysiske mål,
     kavitetsskygge i fordypninger, og blyantskravering i fire trinn.
   </description>
-  <version>1.0.0</version>
-  <date>2026-09-16</date>
+  <version>1.1.0</version>
+  <date>2026-09-17</date>
 
   <maintainer email="christian.christensen@scaleaq.com">Christian Leon</maintainer>
   <author>Christian Leon</author>
@@ -25,7 +25,7 @@
     <macro>
       <name>MatCap</name>
       <description>Matcap-materialer, overflate og skravering i 3D-visningen</description>
-      <version>1.0.0</version>
+      <version>1.1.0</version>
       <icon>MatCap.svg</icon>
       <subdirectory>./</subdirectory>
       <files>
@@ -36,6 +36,8 @@
         <file>matcaps/clay_light.png</file>
         <file>matcaps/clay_warm.png</file>
         <file>matcaps/metal_alu.png</file>
+        <file>matcaps/metal_anodised.png</file>
+        <file>matcaps/metal_anodised_light.png</file>
         <file>matcaps/metal_dark.png</file>
         <file>matcaps/metal_steel.png</file>
         <file>matcaps/plast_cream.png</file>
@@ -46,6 +48,7 @@
         <file>matcaps/toon_moss.png</file>
         <file>matcaps/toon_paper.png</file>
         <file>matcaps/toon_sky.png</file>
+        <file>matcaps/LICENSE.txt</file>
       </files>
       <freecadmin>1.0</freecadmin>
     </macro>

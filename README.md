@@ -38,6 +38,7 @@ allerede har: pivy, PySide og Coin3D.
 | `matcaps/` | Femten teksturer i fire familier |
 | `package.xml` | Metadata for Addon Manager |
 | `make_matcaps.py` | Lager teksturene |
+| `preview.py` | Viser en matcap på en form, uten FreeCAD |
 | `import_blender_matcaps.py` | Henter Blenders matcaps og konverterer dem |
 | `make_hatch_sheet.py` | Referanseark for skravering tegnet for hånd |
 | `demo_wheel.py` | Bygger et riflet ratt som testobjekt |
@@ -49,14 +50,52 @@ laget den, og de følger med så settet kan bygges på nytt.
 Panelet leser bare toppnivået i `matcaps/`. Legger du noe i en undermappe,
 er det tilgjengelig uten å rote til listen.
 
+## Se en matcap uten å starte FreeCAD
+
+```bash
+python3 preview.py metal_anodised --blast 0.12
+python3 preview.py metal_anodised --shape sphere
+```
+
+Standardformen er en avrundet kasse med fas, ikke en kule. En kule gjengir
+bare teksturen slik den allerede er, så den sier ingenting nytt; det er
+flatene og fasen som avslører om materialet holder. Panelet i FreeCAD viser
+kuler, og det er riktig der, for der skal du kjenne igjen teksturen.
+
+Kornet oppgis i millimeter på emnet. Under omtrent 0,3 mm er det mindre
+enn en piksel, og leses som en svak mykning i stedet for prikker. Slik er
+det i virkeligheten også: blåsemønsteret du ser i produktfoto er makro.
+
 ## Materialene
 
 | Familie | Teksturer |
 | --- | --- |
 | Metall | `metal_steel`, `metal_alu`, `metal_dark`, `bl_metal_full` |
+| Anodisert | `metal_anodised`, `metal_anodised_light` |
 | Leire | `clay_light`, `clay_warm`, `bl_clay_studio` |
 | Lys plast | `plast_white`, `plast_grey`, `plast_cream`, `print_pla_grey` |
 | Trinnvis | `toon_paper`, `toon_sky`, `toon_clay`, `toon_moss` |
+
+### Anodisert aluminium
+
+Mørkt, matt og kulepolert, slik frest aluminium ser ut i et hvitt
+produktstudio. Tre valg gjør jobben, og to av dem er mot intuisjonen:
+
+**Lav ruhet, men lav spekularitet.** Det høres selvmotsigende ut, men
+blåst aluminium speiler ikke skarpt, samtidig som det fortsatt gjengir
+taket som en bred lys flate og gulvet som en mørkere. Skrur man opp
+ruheten, midles miljøet til én tone, og toppflaten og forsiden mister
+forskjellen som gjør at formen leses.
+
+**Metallverdi 0,72, ikke 1,0.** Full metallverdi fjerner det diffuse
+leddet, og da er miljøet alene om å skape form. Med litt dielektrisk igjen
+får flatene vanlig formskygge også.
+
+**Lyst gulv i miljøet, men ikke like lyst som taket.** Et hvitt studio gjør
+at undersiden blir mørk grå i stedet for svart. Gjør man gulvet nesten like
+lyst som taket, forsvinner formen igjen. Begge grøftene var innom underveis.
+
+Bruk dem med Sandblåst 0,05 mm, som automatikken velger selv.
 
 ### Trinnvise materialer
 
@@ -98,17 +137,7 @@ plast kom ut grå. Nå går et raskt forpass over kula og finner hva de to
 lysleddene faktisk når, og de tallene brukes som normalisering. Da stemmer
 det uansett hvordan lysene flyttes.
 
-## Installasjon
-
-Lenkene er allerede på plass. Skal det gjøres på nytt, merk at FreeCAD 1.1
-bruker en versjonert mappe, `v1-1`, ikke `Macro` direkte:
-
-```bash
-ln -sfn ~/dev/freecad/matcap/MatCap.FCMacro ~/Library/Application\ Support/FreeCAD/v1-1/Macro/
-ln -sfn ~/dev/freecad/matcap/matcaps ~/Library/Application\ Support/FreeCAD/v1-1/Macro/
-```
-
-Riktig sti finner du alltid med `FreeCAD.getUserMacroDir(True)` i konsollen.
+## Bruk
 
 Åpne panelet med **Macro → Macros…**, velg `MatCap` i listen og trykk
 **Execute**. Panelet kommer som et eget vindu og kan stå åpent mens du
@@ -130,9 +159,8 @@ egne, endre `PRESETS` i `make_matcaps.py` og kjør den på nytt.
 
 ### Fra Blender
 
-De 20 `bl_`-teksturene kommer fra Blenders egen sculpt-modus og ligger
-allerede i mappen. Vil du hente dem på nytt, for eksempel etter en
-Blender-oppdatering:
+To `bl_`-teksturer kommer fra Blenders egen sculpt-modus. Vil du hente
+dem på nytt, for eksempel etter en Blender-oppdatering:
 
 ```bash
 python3 import_blender_matcaps.py

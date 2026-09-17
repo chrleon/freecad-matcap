@@ -352,6 +352,14 @@ SOFT = dict(sky=(0.80, 0.83, 0.88),
             horizon=(0.94, 0.94, 0.93),
             ground=(0.42, 0.42, 0.44))
 
+# Hvitt produktstudio. Lyst nok under til at undersiden ikke faller ut i
+# svart, men ikke så jevnt at alt blir én tone: det var første feilen her.
+# Er gulvet nesten like lyst som taket, får toppflaten og forsiden samme
+# verdi, og formen forsvinner selv om fargen er riktig.
+STUDIO_WHITE = dict(sky=(0.88, 0.90, 0.95),
+                    horizon=(1.00, 1.00, 1.00),
+                    ground=(0.40, 0.40, 0.43))
+
 PRESETS = {
     # metall
     "metal_steel": dict(base=(0.70, 0.72, 0.75), metallic=1.0, roughness=0.30,
@@ -360,6 +368,26 @@ PRESETS = {
                       spec_power=45, spec_strength=0.28, **STUDIO),
     "metal_dark": dict(base=(0.44, 0.45, 0.48), metallic=1.0, roughness=0.22,
                        spec_power=120, spec_strength=0.45, **STUDIO),
+
+    # Anodisert og kulepolert aluminium, slik det ser ut i et hvitt
+    # produktstudio. Nøkkelen er høy ruhet: da midles miljøet ut til en
+    # bred, myk overgang i stedet for en speiling, og det er nettopp det
+    # blåsingen gjør med overflaten. Lav spekularitet av samme grunn.
+    # Lav ruhet, men lav spekularitet. Det er ikke en selvmotsigelse:
+    # blåst aluminium speiler ikke, men det gjengir fortsatt taket som en
+    # bred lys flate og gulvet som en mørkere. Skrur man opp ruheten her,
+    # midles miljøet til én farge, og da mister toppflaten og forsiden
+    # forskjellen som gjør at formen leses.
+    # Metallverdien er 0,72 og ikke 1,0. Full metallverdi fjerner det
+    # diffuse leddet, og da er miljøet alene om å skape form. Med litt
+    # dielektrisk igjen får flatene også vanlig formskygge, og det er den
+    # kombinasjonen som leser som anodisert og ikke som speil.
+    "metal_anodised": dict(base=(0.50, 0.51, 0.54), metallic=0.72,
+                           roughness=0.30, spec_power=26, spec_strength=0.16,
+                           **STUDIO_WHITE),
+    "metal_anodised_light": dict(base=(0.72, 0.73, 0.75), metallic=0.72,
+                                 roughness=0.28, spec_power=30,
+                                 spec_strength=0.18, **STUDIO_WHITE),
 
     # leire
     "clay_light": dict(base=(0.80, 0.78, 0.75), metallic=0.0, roughness=0.9,

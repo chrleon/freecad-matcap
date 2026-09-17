@@ -28,8 +28,8 @@ __Name__ = "MatCap"
 __Comment__ = ("Matcap-materialer, overflateruhet, kavitetsskygge og "
                "blyantskravering rett i 3D-visningen")
 __Author__ = "Christian Leon"
-__Version__ = "1.0.0"
-__Date__ = "2026-09-16"
+__Version__ = "1.1.0"
+__Date__ = "2026-09-17"
 __License__ = "MIT"
 __Web__ = "https://github.com/chrleon/freecad-matcap"
 __Wiki__ = "https://github.com/chrleon/freecad-matcap"
@@ -41,6 +41,8 @@ __Files__ = ("MatCap.svg,"
              "matcaps/bl_clay_studio.png,matcaps/bl_metal_full.png,"
              "matcaps/clay_light.png,matcaps/clay_warm.png,"
              "matcaps/metal_alu.png,matcaps/metal_dark.png,"
+             "matcaps/metal_anodised.png,"
+             "matcaps/metal_anodised_light.png,"
              "matcaps/metal_steel.png,matcaps/plast_cream.png,"
              "matcaps/plast_grey.png,matcaps/plast_white.png,"
              "matcaps/print_pla_grey.png,matcaps/toon_clay.png,"
@@ -352,6 +354,9 @@ FINISHES = [
 # fra før og trenger ingen, metall tåler dreide riper, hard surface ser
 # riktig ut sandblåst.
 FINISH_DEFAULTS = {
+    # Mer spesifikke prefikser først. Oppslaget tar første treff, så
+    # "metal_anodised" må stå over "metal", ellers blir den dreid.
+    "metal_anodised": "Sandblåst 0,05 mm",
     "metal": "Dreid 0,1 mm",
     "bl_metal": "Dreid 0,1 mm",
     "plast": "Sandblåst 0,05 mm",
