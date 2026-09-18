@@ -556,11 +556,29 @@ def find_matcap_group(node):
     return None, None
 
 
+def remember_material(view_object, navn):
+    """Skriver materialvalget som en egenskap paa objektet.
+
+    Shaderen lever bare i scenegrafen, men navnet lagres i FCStd-fila.
+    Det er det som lar andre verktoey, som PbrView, vite hvilket
+    materiale du valgte, uten at de to trenger aa kjenne hverandre.
+    """
+    try:
+        if "MatCapMaterial" not in view_object.PropertiesList:
+            view_object.addProperty("App::PropertyString", "MatCapMaterial",
+                                    "MatCap", "Valgt matcap-materiale")
+        view_object.MatCapMaterial = navn or ""
+    except Exception:
+        pass
+
+
 def apply_to(view_object, path, tint, line_color=None, line_width=None,
              finish=0, amount=0.0, scale=1.0,
              hatch=0, spacing=6.0, strength=0.62,
              cavity=0.0, cavity_radius=0.8):
     remove_from(view_object)
+    remember_material(view_object,
+                      os.path.splitext(os.path.basename(path))[0])
     hosts = shader_hosts(view_object)
     for host in hosts:
         host.insertChild(build_shader(path, tint, finish, amount, scale,
@@ -581,6 +599,7 @@ def apply_to(view_object, path, tint, line_color=None, line_width=None,
 
 def remove_from(view_object):
     removed = 0
+    remember_material(view_object, "")
     for host in shader_hosts(view_object) + [root_of(view_object)]:
         while True:
             idx, group = find_matcap_group(host)
