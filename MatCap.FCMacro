@@ -556,20 +556,52 @@ def find_matcap_group(node):
     return None, None
 
 
-def remember_material(view_object, navn):
-    """Skriver materialvalget som en egenskap paa objektet.
+def material_card(navn):
+    """Finner materialkortet som hoerer til en matcap.
 
-    Shaderen lever bare i scenegrafen, men navnet lagres i FCStd-fila.
-    Det er det som lar andre verktoey, som PbrView, vite hvilket
-    materiale du valgte, uten at de to trenger aa kjenne hverandre.
+    Kortene skrives av make_material_cards.py og ligger i brukerens
+    materialbibliotek. De baerer Disney-modellen, som er Principled BSDF
+    under et annet navn, og som ogsaa Render-arbeidsbenken forstaar.
+    """
+    if not navn:
+        return None
+    try:
+        import Materials
+        kortnavn = "MatCap_" + navn
+        for mat in Materials.MaterialManager().Materials.values():
+            if mat.Name == kortnavn:
+                return mat
+    except Exception:
+        pass
+    return None
+
+
+def remember_material(obj, view_object, navn):
+    """Lagrer materialvalget i dokumentet.
+
+    To ting skrives. ShapeMaterial peker paa et ordentlig materialkort,
+    og det er den andre verktoey skal lese. Strengen er bare en notis om
+    hvilken tekstur som ble valgt, siden kortet ikke kjenner til
+    matcap-bildet.
+
+    Et materiale bygget i minnet overlever ikke lagring: FreeCAD lagrer
+    en UUID-referanse, og finner den ikke kortet igjen i et bibliotek,
+    faller materialet tilbake til Default. Derfor kortene.
     """
     try:
         if "MatCapMaterial" not in view_object.PropertiesList:
             view_object.addProperty("App::PropertyString", "MatCapMaterial",
-                                    "MatCap", "Valgt matcap-materiale")
+                                    "MatCap", "Valgt matcap-tekstur")
         view_object.MatCapMaterial = navn or ""
     except Exception:
         pass
+
+    kort = material_card(navn)
+    if kort is not None and obj is not None:
+        try:
+            obj.ShapeMaterial = kort
+        except Exception:
+            pass
 
 
 def apply_to(view_object, path, tint, line_color=None, line_width=None,
@@ -577,7 +609,7 @@ def apply_to(view_object, path, tint, line_color=None, line_width=None,
              hatch=0, spacing=6.0, strength=0.62,
              cavity=0.0, cavity_radius=0.8):
     remove_from(view_object)
-    remember_material(view_object,
+    remember_material(getattr(view_object, "Object", None), view_object,
                       os.path.splitext(os.path.basename(path))[0])
     hosts = shader_hosts(view_object)
     for host in hosts:
@@ -599,7 +631,6 @@ def apply_to(view_object, path, tint, line_color=None, line_width=None,
 
 def remove_from(view_object):
     removed = 0
-    remember_material(view_object, "")
     for host in shader_hosts(view_object) + [root_of(view_object)]:
         while True:
             idx, group = find_matcap_group(host)

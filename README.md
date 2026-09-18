@@ -38,6 +38,7 @@ allerede har: pivy, PySide og Coin3D.
 | `matcaps/` | Elleve teksturer i fire familier |
 | `package.xml` | Metadata for Addon Manager |
 | `make_matcaps.py` | Lager teksturene |
+| `make_material_cards.py` | Skriver materialene som FreeCAD-materialkort |
 | `preview.py` | Viser en matcap på en form, uten FreeCAD |
 | `import_blender_matcaps.py` | Henter Blenders matcaps og konverterer dem |
 | `make_hatch_sheet.py` | Referanseark for skravering tegnet for hånd |
@@ -49,6 +50,33 @@ laget den, og de følger med så settet kan bygges på nytt.
 
 Panelet leser bare toppnivået i `matcaps/`. Legger du noe i en undermappe,
 er det tilgjengelig uten å rote til listen.
+
+## Materialkort
+
+Materialene finnes også som ordentlige FreeCAD-materialkort, med
+Disney-modellen, som er Principled BSDF under et annet navn. Velger du et
+materiale i panelet, settes objektets `ShapeMaterial` til det tilsvarende
+kortet, og valget lagres i FCStd-fila.
+
+```bash
+python3 make_material_cards.py
+```
+
+Kortene havner i `Material/MatCap/` i brukerens FreeCAD-mappe. Start
+FreeCAD på nytt, eller kall `MaterialManager().refresh()`.
+
+**Kort, ikke egenskaper i minnet.** Et materiale bygget i minnet og satt
+rett på `ShapeMaterial` overlever ikke lagring: FreeCAD lagrer bare en
+UUID-referanse, og finner den ikke kortet igjen i et bibliotek, faller
+materialet tilbake til Default når fila åpnes. Det er målt, ikke antatt.
+
+UUID-ene genereres fra materialnavnet med et fast navnerom, så de er de
+samme hver gang skriptet kjøres. Endret de seg, ville alle lagrede
+dokumenter mistet materialet sitt.
+
+To ting som overrasket underveis. FreeCAD bruker filnavnet som materialets
+`Name`, ikke `Name`-feltet inne i kortet. Og `obj.ShapeMaterial` gir deg
+en kopi: endrer du den, skjer ingenting før du tilordner den tilbake.
 
 ## Se en matcap uten å starte FreeCAD
 
