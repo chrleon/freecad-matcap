@@ -140,8 +140,13 @@ det uansett hvordan lysene flyttes.
 ## Bruk
 
 Åpne panelet med **Macro → Macros…**, velg `MatCap` i listen og trykk
-**Execute**. Panelet kommer som et eget vindu og kan stå åpent mens du
-jobber.
+**Execute**. Det dokker seg til høyre, ved siden av modelltreet, og kan
+stå åpent mens du jobber.
+
+Dra det ut av kanten om du heller vil ha et frittstående vindu, eller dra
+det tilbake for å feste det igjen. FreeCAD husker plasseringen mellom
+økter, siden dokka har et fast objektnavn. Vil du at det alltid skal åpne
+som vindu, kall `show(docked=False)`.
 
 Alt slår inn med én gang. Ett klikk på et materiale bytter det,
 glidebryterne oppdaterer mens du drar, og markerer du noe nytt i

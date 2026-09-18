@@ -28,8 +28,8 @@ __Name__ = "MatCap"
 __Comment__ = ("Matcap-materialer, overflateruhet, kavitetsskygge og "
                "blyantskravering rett i 3D-visningen")
 __Author__ = "Christian Leon"
-__Version__ = "1.2.0"
-__Date__ = "2026-09-17"
+__Version__ = "1.3.0"
+__Date__ = "2026-09-18"
 __License__ = "MIT"
 __Web__ = "https://github.com/chrleon/freecad-matcap"
 __Wiki__ = "https://github.com/chrleon/freecad-matcap"
@@ -631,7 +631,6 @@ class MatCapPanel(QtGui.QWidget):
     def __init__(self):
         super(MatCapPanel, self).__init__()
         self.setWindowTitle("MatCap")
-        self.setWindowFlags(QtCore.Qt.Tool)
 
         layout = QtGui.QVBoxLayout(self)
         layout.setSpacing(8)
@@ -851,14 +850,77 @@ class MatCapPanel(QtGui.QWidget):
         self.status.setText("Fjernet fra %d objekt(er)" % n)
 
 
-def show():
-    global _matcap_panel
+class MatCapDock(QtGui.QDockWidget):
+    """Dokka rundt panelet.
+
+    Lukker man dokka, får ikke widgeten inni beskjed av seg selv, og da
+    blir utvalgsobservatøren liggende igjen i FreeCAD og peke på et panel
+    som er borte. Derfor sendes lukkingen videre her.
+    """
+
+    def closeEvent(self, event):
+        panel = self.widget()
+        if panel is not None:
+            panel.close()
+        super(MatCapDock, self).closeEvent(event)
+
+
+def _forget_previous():
+    """Rydder bort forrige panel og dokk før vi lager nye."""
+    for name in ("_matcap_panel", "_matcap_dock"):
+        widget = globals().get(name)
+        if widget is None:
+            continue
+        try:
+            widget.close()
+            widget.setParent(None)
+            widget.deleteLater()
+        except Exception:
+            pass
+        globals()[name] = None
+
+    # En dokk fra en tidligere kjøring kan ligge igjen selv om variabelen
+    # er borte, for eksempel etter at makroen er redigert og kjørt på
+    # nytt. Vi finner den på objektnavnet.
     try:
-        _matcap_panel.close()
+        main = Gui.getMainWindow()
+        for dock in main.findChildren(QtGui.QDockWidget):
+            if dock.objectName() == "MatCapDock":
+                dock.close()
+                dock.setParent(None)
+                dock.deleteLater()
     except Exception:
         pass
+
+
+def show(docked=True):
+    """Åpner panelet, dokket til høyre eller som eget vindu.
+
+    Dokka har sin egen flyteknapp, så valget her er bare utgangspunktet.
+    Dra den ut av kanten, og den blir et vindu; dra den tilbake, og den
+    fester seg igjen.
+    """
+    global _matcap_panel, _matcap_dock
+    _forget_previous()
+
     _matcap_panel = MatCapPanel()
-    _matcap_panel.show()
+    if not docked:
+        _matcap_panel.setWindowFlags(QtCore.Qt.Tool)
+        _matcap_panel.show()
+        _matcap_dock = None
+        return _matcap_panel
+
+    main = Gui.getMainWindow()
+    _matcap_dock = MatCapDock("MatCap", main)
+    # Objektnavnet er det FreeCAD bruker til å huske plasseringen mellom
+    # økter. Uten det havner dokka til høyre hver gang.
+    _matcap_dock.setObjectName("MatCapDock")
+    _matcap_dock.setWidget(_matcap_panel)
+    _matcap_dock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea
+                                 | QtCore.Qt.RightDockWidgetArea)
+    main.addDockWidget(QtCore.Qt.RightDockWidgetArea, _matcap_dock)
+    _matcap_dock.show()
+    _matcap_dock.raise_()
     return _matcap_panel
 
 
