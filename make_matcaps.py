@@ -334,11 +334,6 @@ TOON = {
         thresholds=TOON_CUTS, blur=TOON_BLUR,
         rim=(1.0, 0.92, 0.78), spec=(1.0, 0.97, 0.90)),
 
-    "toon_moss": dict(
-        levels=[(0.22, 0.31, 0.30), (0.37, 0.50, 0.38),
-                (0.58, 0.70, 0.47), (0.81, 0.88, 0.65)],
-        thresholds=TOON_CUTS, blur=TOON_BLUR,
-        rim=(0.94, 0.99, 0.86), spec=(1.0, 1.0, 0.94)),
 }
 
 
@@ -364,8 +359,6 @@ PRESETS = {
     # metall
     "metal_steel": dict(base=(0.70, 0.72, 0.75), metallic=1.0, roughness=0.30,
                         spec_power=90, spec_strength=0.40, **STUDIO),
-    "metal_alu": dict(base=(0.78, 0.79, 0.80), metallic=1.0, roughness=0.45,
-                      spec_power=45, spec_strength=0.28, **STUDIO),
     "metal_dark": dict(base=(0.44, 0.45, 0.48), metallic=1.0, roughness=0.22,
                        spec_power=120, spec_strength=0.45, **STUDIO),
 
@@ -382,23 +375,12 @@ PRESETS = {
     # diffuse leddet, og da er miljøet alene om å skape form. Med litt
     # dielektrisk igjen får flatene også vanlig formskygge, og det er den
     # kombinasjonen som leser som anodisert og ikke som speil.
-    "metal_anodised": dict(base=(0.50, 0.51, 0.54), metallic=0.72,
-                           roughness=0.30, spec_power=26, spec_strength=0.16,
-                           **STUDIO_WHITE),
-    "metal_anodised_light": dict(base=(0.72, 0.73, 0.75), metallic=0.72,
-                                 roughness=0.28, spec_power=30,
-                                 spec_strength=0.18, **STUDIO_WHITE),
-
-    # leire
     "clay_light": dict(base=(0.80, 0.78, 0.75), metallic=0.0, roughness=0.9,
                        spec_power=16, spec_strength=0.05, wrap=0.35, **SOFT),
     "clay_warm": dict(base=(0.78, 0.68, 0.58), metallic=0.0, roughness=0.9,
                       spec_power=16, spec_strength=0.05, wrap=0.35, **SOFT),
 
     # lys plast
-    "plast_white": dict(base=(0.90, 0.90, 0.89), metallic=0.0, roughness=0.6,
-                        spec_power=34, spec_strength=0.16, wrap=0.45,
-                        rim=0.22, **SOFT),
     "plast_grey": dict(base=(0.74, 0.75, 0.77), metallic=0.05, roughness=0.55,
                        spec_power=40, spec_strength=0.20, wrap=0.40,
                        rim=0.18, **SOFT),
@@ -409,6 +391,33 @@ PRESETS = {
     # printet plast. Mer spredning og tydeligere kantglød enn støpt plast,
     # fordi lagene slipper gjennom lys i kantene. Uten det ser printet PLA
     # ut som gips.
+}
+
+
+# Tatt ut av settet, men ikke kastet. Oppskriften er det som er verdt
+# noe, ikke selve fila: vil du ha en av dem tilbake, flytt den hit
+# opp i PRESETS og kjør skriptet. Teksturene ligger i matcaps/extra.
+# toon_moss hører til render_toon, ikke render, så den skal i så
+# fall tilbake til TOON.
+RETIRED = {
+    "toon_moss": dict(
+        levels=[(0.22, 0.31, 0.30), (0.37, 0.50, 0.38),
+                (0.58, 0.70, 0.47), (0.81, 0.88, 0.65)],
+        thresholds=TOON_CUTS, blur=TOON_BLUR,
+        rim=(0.94, 0.99, 0.86), spec=(1.0, 1.0, 0.94)),
+    "metal_alu": dict(base=(0.78, 0.79, 0.80), metallic=1.0, roughness=0.45,
+                      spec_power=45, spec_strength=0.28, **STUDIO),
+    "metal_anodised": dict(base=(0.50, 0.51, 0.54), metallic=0.72,
+                           roughness=0.30, spec_power=26, spec_strength=0.16,
+                           **STUDIO_WHITE),
+    "metal_anodised_light": dict(base=(0.72, 0.73, 0.75), metallic=0.72,
+                                 roughness=0.28, spec_power=30,
+                                 spec_strength=0.18, **STUDIO_WHITE),
+
+    # leire
+    "plast_white": dict(base=(0.90, 0.90, 0.89), metallic=0.0, roughness=0.6,
+                        spec_power=34, spec_strength=0.16, wrap=0.45,
+                        rim=0.22, **SOFT),
     "print_pla_grey": dict(base=(0.70, 0.70, 0.71), metallic=0.0,
                            roughness=0.85, spec_power=22, spec_strength=0.10,
                            wrap=0.55, rim=0.30, **SOFT),

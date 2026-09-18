@@ -28,7 +28,7 @@ __Name__ = "MatCap"
 __Comment__ = ("Matcap-materialer, overflateruhet, kavitetsskygge og "
                "blyantskravering rett i 3D-visningen")
 __Author__ = "Christian Leon"
-__Version__ = "1.3.0"
+__Version__ = "1.4.0"
 __Date__ = "2026-09-18"
 __License__ = "MIT"
 __Web__ = "https://github.com/chrleon/freecad-matcap"
@@ -38,17 +38,17 @@ __Help__ = "Marker objekter og trykk Bruk, eller kjør uten markering."
 __Status__ = "Stable"
 __Requires__ = "FreeCAD >= 1.0"
 __Files__ = ("MatCap.svg,"
-             "matcaps/bl_clay_studio.png,matcaps/bl_metal_full.png,"
-             "matcaps/clay_light.png,matcaps/clay_warm.png,"
-             "matcaps/metal_alu.png,matcaps/metal_dark.png,"
-             "matcaps/metal_anodised.png,"
-             "matcaps/metal_anodised_light.png,"
-             "matcaps/metal_steel.png,matcaps/plast_cream.png,"
-             "matcaps/plast_grey.png,matcaps/plast_white.png,"
-             "matcaps/print_pla_grey.png,matcaps/toon_clay.png,"
-             "matcaps/toon_moss.png,matcaps/toon_paper.png,"
+             "matcaps/bl_clay_studio.png,"
+             "matcaps/bl_metal_full.png,"
+             "matcaps/clay_light.png,"
+             "matcaps/clay_warm.png,"
+             "matcaps/metal_dark.png,"
+             "matcaps/metal_steel.png,"
+             "matcaps/plast_cream.png,"
+             "matcaps/plast_grey.png,"
+             "matcaps/toon_clay.png,"
+             "matcaps/toon_paper.png,"
              "matcaps/toon_sky.png")
-
 __title__ = __Name__
 __author__ = __Author__
 __version__ = __Version__
@@ -346,7 +346,7 @@ TEXTURE = (2, 0.16, 20.0)   # modus, dybde, perioder per millimeter
 
 # Materialfamilier som skal ha tekstur på fra start. Leire er matt fra
 # før, og trinnene i en toon-matcap brytes opp av ruhet.
-TEXTURE_ON = ("metal", "bl_metal", "plast", "print")
+TEXTURE_ON = ("metal", "bl_metal", "plast")
 
 
 

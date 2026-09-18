@@ -35,7 +35,7 @@ allerede har: pivy, PySide og Coin3D.
 | Fil | Hva det er |
 | --- | --- |
 | `MatCap.FCMacro` | Makroen, med panel for valg av materiale |
-| `matcaps/` | Femten teksturer i fire familier |
+| `matcaps/` | Elleve teksturer i fire familier |
 | `package.xml` | Metadata for Addon Manager |
 | `make_matcaps.py` | Lager teksturene |
 | `preview.py` | Viser en matcap på en form, uten FreeCAD |
@@ -53,9 +53,12 @@ er det tilgjengelig uten å rote til listen.
 ## Se en matcap uten å starte FreeCAD
 
 ```bash
-python3 preview.py metal_anodised --blast 0.12
-python3 preview.py metal_anodised --shape sphere
+python3 preview.py metal_steel --blast 0.12
+python3 preview.py metal_steel --shape sphere
 ```
+
+Den finner også teksturer som ligger i `extra/`, siden det ofte er
+nettopp da man vil se på dem igjen.
 
 Standardformen er en avrundet kasse med fas, ikke en kule. En kule gjengir
 bare teksturen slik den allerede er, så den sier ingenting nytt; det er
@@ -70,15 +73,21 @@ det i virkeligheten også: blåsemønsteret du ser i produktfoto er makro.
 
 | Familie | Teksturer |
 | --- | --- |
-| Metall | `metal_steel`, `metal_alu`, `metal_dark`, `bl_metal_full` |
-| Anodisert | `metal_anodised`, `metal_anodised_light` |
+| Metall | `metal_steel`, `metal_dark`, `bl_metal_full` |
 | Leire | `clay_light`, `clay_warm`, `bl_clay_studio` |
-| Lys plast | `plast_white`, `plast_grey`, `plast_cream`, `print_pla_grey` |
-| Trinnvis | `toon_paper`, `toon_sky`, `toon_clay`, `toon_moss` |
+| Lys plast | `plast_grey`, `plast_cream` |
+| Trinnvis | `toon_paper`, `toon_sky`, `toon_clay` |
+
+Seks teksturer er tatt ut av settet og ligger i `matcaps/extra/`:
+`metal_alu`, `metal_anodised`, `metal_anodised_light`, `plast_white`,
+`print_pla_grey` og `toon_moss`. Flytt en fil opp ett nivå for å få den
+tilbake i panelet. Oppskriftene står igjen i `RETIRED` i
+`make_matcaps.py`, så de kan også lages på nytt.
 
 ### Anodisert aluminium
 
-Mørkt, matt og kulepolert, slik frest aluminium ser ut i et hvitt
+Ikke i settet lenger, men oppskriften står igjen i `RETIRED` fordi den er
+verdt å kunne. Mørkt, matt og kulepolert, slik frest aluminium ser ut i et hvitt
 produktstudio. Tre valg gjør jobben, og to av dem er mot intuisjonen:
 
 **Lav ruhet, men lav spekularitet.** Det høres selvmotsigende ut, men
@@ -95,7 +104,8 @@ får flatene vanlig formskygge også.
 at undersiden blir mørk grå i stedet for svart. Gjør man gulvet nesten like
 lyst som taket, forsvinner formen igjen. Begge grøftene var innom underveis.
 
-Bruk dem med Sandblåst 0,05 mm, som automatikken velger selv.
+Bruk dem med teksturen på, som automatikken velger selv for
+metall.
 
 ### Trinnvise materialer
 

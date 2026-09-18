@@ -5,8 +5,8 @@ Rendrer en avrundet kasse med fas, omtrent som et frest aluminiumshus, og
 shader den med matcapen alene. Det er den ærlige testen: en matcap på en
 kule sier lite, for kula er nettopp det teksturen allerede er.
 
-    python3 preview.py metal_anodised
-    python3 preview.py metal_anodised --blast 0.05 --out /tmp/test.png
+    python3 preview.py metal_steel
+    python3 preview.py metal_steel --blast 0.05 --out /tmp/test.png
 
 Kjører i ren Python, ingen avhengigheter. Et bilde tar noen sekunder.
 """
@@ -303,9 +303,14 @@ def main():
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
+    # Pensjonerte teksturer ligger i extra/ og skal fortsatt kunne
+    # forhåndsvises; det er ofte nettopp da man vil se på dem igjen.
     path = os.path.join(MATCAPS, args.name + ".png")
     if not os.path.exists(path):
-        sys.exit("fant ikke %s" % path)
+        path = os.path.join(MATCAPS, "extra", args.name + ".png")
+    if not os.path.exists(path):
+        sys.exit("fant ikke %s.png, verken i matcaps/ eller matcaps/extra/"
+                 % args.name)
 
     global SHAPE
     SHAPE = args.shape
