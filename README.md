@@ -39,6 +39,7 @@ allerede har: pivy, PySide og Coin3D.
 | `package.xml` | Metadata for Addon Manager |
 | `make_matcaps.py` | Lager teksturene |
 | `make_material_cards.py` | Skriver materialene som FreeCAD-materialkort |
+| `export_render_materials.py` | Bro til Render-arbeidsbenken |
 | `preview.py` | Viser en matcap på en form, uten FreeCAD |
 | `import_blender_matcaps.py` | Henter Blenders matcaps og konverterer dem |
 | `make_hatch_sheet.py` | Referanseark for skravering tegnet for hånd |
@@ -56,7 +57,8 @@ er det tilgjengelig uten å rote til listen.
 Materialene finnes også som ordentlige FreeCAD-materialkort, med
 Disney-modellen, som er Principled BSDF under et annet navn. Velger du et
 materiale i panelet, settes objektets `ShapeMaterial` til det tilsvarende
-kortet, og valget lagres i FCStd-fila.
+kortet, og valget lagres i FCStd-fila. PbrView leser det direkte.
+Render-arbeidsbenken trenger en bro, se nedenfor.
 
 ```bash
 python3 make_material_cards.py
@@ -77,6 +79,38 @@ dokumenter mistet materialet sitt.
 To ting som overrasket underveis. FreeCAD bruker filnavnet som materialets
 `Name`, ikke `Name`-feltet inne i kortet. Og `obj.ShapeMaterial` gir deg
 en kopi: endrer du den, skjer ingenting før du tilordner den tilbake.
+
+## Render-arbeidsbenken
+
+Render-arbeidsbenken leser **ikke** `ShapeMaterial`. Det trodde jeg først,
+og det er målt feil. Den ser etter en lenke `obj.Material` til et
+`App::MaterialObjectPython`, og leser en ordbok derfra som må inneholde
+nøkkelen `Render.Type`. Uten den faller benken tilbake til en diffus
+standardfarge uansett hva som ellers står i ordboken.
+
+Parameternavnene er derimot de samme, `Render.Disney.BaseColor`,
+`.Metallic` og `.Roughness`, så det er beholderen som skiller, ikke
+betydningen. Broen er derfor kort:
+
+```bash
+exec(open("export_render_materials.py").read())
+export_render_materials()
+```
+
+Den leser Disney-verdiene fra `ShapeMaterial` og legger dem i formatet
+Render-benken forventer. Materialobjektene legges bare til når du ber om
+det, så et dokument du bare modellerer i slipper å bære dem. Kjører du
+skriptet flere ganger, gjenbrukes objektene i stedet for å dupliseres.
+
+Verifisert helt ned til rendererfilen. For `clay_warm` gir LuxCore:
+
+```
+scene.materials.Ratt.type = disney
+scene.materials.Ratt.metallic = 0.0
+scene.materials.Ratt.roughness = 0.9
+```
+
+Grunnfargen konverteres til lineært fargerom på veien, som den skal.
 
 ## Se en matcap uten å starte FreeCAD
 
